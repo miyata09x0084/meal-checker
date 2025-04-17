@@ -1,0 +1,43 @@
+# 共通の除外設定
+.DS_Store
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
+*.log
+logs/
+.cache/
+
+# フロントエンド（Next.js）
+## 依存関係
+frontend/node_modules/
+## ビルド関連
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.vercel/
+## デバッグ
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+## テスト関連
+frontend/coverage/
+## 型定義
+frontend/*.tsbuildinfo
+
+# バックエンド（Python）
+## 仮想環境と依存関係
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.py[cod]
+backend/*$py.class
+## テスト関連
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+## ビルド関連
+backend/dist/
+backend/build/
+backend/*.egg-info/ 
