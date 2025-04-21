@@ -1,0 +1,29 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: 食事バランス診断アプリの技術仕様と開発方針
+alwaysApply: true
+---
+
+# Meal Balance App - App Specification
+
+## 🧠 概要
+ユーザーが食事写真をアップロードし、GPT-4o Vision APIを使って「主食・主菜・副菜」のバランス診断を行うアプリです。
+
+## 🏗️ 技術スタック
+
+- Frontend: Next.js (TypeScript) + Chakra UI
+- Backend: FastAPI (Python) + Docker
+- AI: GPT-4o Vision API（OpenAI）
+- Storage/Auth/DB: Supabase
+- デプロイ先: Frontend → Vercel / Backend → GCP Cloud Run
+
+## 🎯 開発方針
+
+- MVPは最小機能に集中（画像アップロード → 診断 → 結果表示）
+- スマホファーストでのUX設計を優先
+- `.env` にて秘密情報を管理（直書き禁止）
+- ファイル名・関数名は目的が明確な命名とする
