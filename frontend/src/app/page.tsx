@@ -1,47 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Box,
-  Button,
-  Container,
-  Flex,
-  Heading,
-  Image,
-  Text,
-  VStack,
-  useToast,
-} from "@chakra-ui/react";
+
+import { Box, Container, Flex, Heading, Text } from "@chakra-ui/react";
+import ImageUploader from "@/components/ImageUploader";
+
+interface AnalysisResult {
+  staple: number;
+  main: number;
+  side: number;
+  comment: string;
+}
 
 export default function Home() {
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const toast = useToast();
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedImage(file);
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+  const handleImageUploaded = (url: string) => {
+    setUploadedImageUrl(url);
   };
 
   const analyzeImage = async () => {
-    if (!selectedImage) {
-      toast({
-        title: "エラー",
-        description: "画像を選択してください",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
+    if (!uploadedImageUrl) {
+      alert("画像をアップロードしてください");
       return;
     }
 
@@ -49,12 +31,12 @@ export default function Home() {
     setResult(null);
 
     try {
-      const formData = new FormData();
-      formData.append("image", selectedImage);
-
       const response = await fetch("http://localhost:8000/analyze", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ image_url: uploadedImageUrl }),
       });
 
       if (!response.ok) {
@@ -65,13 +47,7 @@ export default function Home() {
       setResult(data);
     } catch (error) {
       console.error("Error:", error);
-      toast({
-        title: "エラー",
-        description: "分析に失敗しました",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
+      alert("分析に失敗しました");
     } finally {
       setAnalyzing(false);
     }
@@ -79,46 +55,41 @@ export default function Home() {
 
   return (
     <Container maxW="container.md" py={8}>
-      <VStack spacing={8} align="stretch">
-        <Heading as="h1" size="xl" textAlign="center">
+      <Box>
+        <Heading as="h1" size="xl" textAlign="center" mb={8}>
           食事バランスチェッカー
         </Heading>
 
-        <Box>
-          <Text mb={2}>
+        <Box mb={6}>
+          <Text mb={4}>
             食事の写真をアップロードして、栄養バランスを分析します
           </Text>
-          <Button as="label" htmlFor="image-upload" colorScheme="blue" w="full">
-            写真を選択する
-            <input
-              id="image-upload"
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              style={{ display: "none" }}
-            />
-          </Button>
+          <ImageUploader onImageUploaded={handleImageUploaded} />
         </Box>
 
-        {previewUrl && (
-          <Box>
-            <Text mb={2}>プレビュー</Text>
-            <Image
-              src={previewUrl}
-              maxH="300px"
-              objectFit="contain"
-              borderRadius="md"
-            />
-            <Button
-              mt={4}
-              colorScheme="teal"
+        {uploadedImageUrl && (
+          <Box mb={4}>
+            <Text fontWeight="bold" mb={2}>
+              アップロードされた画像:
+            </Text>
+            <Box
+              as="button"
               onClick={analyzeImage}
-              isLoading={analyzing}
-              loadingText="分析中..."
+              aria-disabled={analyzing}
+              _disabled={{ bg: "gray.300", cursor: "not-allowed" }}
+              borderWidth="1px"
+              borderRadius="lg"
+              borderColor="gray.200"
+              p={2}
               w="full"
+              textAlign="center"
+              bg={analyzing ? "gray.300" : "teal.500"}
+              color="white"
+              _hover={{ bg: analyzing ? "gray.300" : "teal.600" }}
+              cursor={analyzing ? "not-allowed" : "pointer"}
             >
-              分析する
-            </Button>
+              {analyzing ? "分析中..." : "分析する"}
+            </Box>
           </Box>
         )}
 
@@ -168,7 +139,7 @@ export default function Home() {
             </Box>
           </Box>
         )}
-      </VStack>
+      </Box>
     </Container>
   );
 }
