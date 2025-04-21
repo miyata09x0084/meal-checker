@@ -10,8 +10,8 @@ import {
   Image,
   Text,
   VStack,
-  useToast,
 } from "@chakra-ui/react";
+import { useToast } from "@chakra-ui/toast";
 
 export default function Home() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
