@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import base64
@@ -6,6 +6,10 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 import openai
 from typing import Dict, Any
+from pydantic import BaseModel
+import re
+import requests
+from io import BytesIO
 
 load_dotenv()
 
@@ -14,7 +18,7 @@ app = FastAPI()
 # CORS設定
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "https://meal-checker-frontend.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,169 +40,165 @@ openai_api_key = os.getenv("OPENAI_API_KEY")
 if openai_api_key:
     openai.api_key = openai_api_key
 
+class ImageUrlRequest(BaseModel):
+    image_url: str
+
 @app.get("/")
 async def root():
     return {"message": "Meal Checker API is working!"}
 
-@app.post("/analyze")
-async def analyze_meal(image: UploadFile = File(...)) -> Dict[str, Any]:
-    # Supabaseが初期化されていない場合
-    if supabase is None:
-        return {
-            "staple": 40,
-            "main": 30,
-            "side": 30,
-            "comment": "テストモード: Supabase接続がないため、テストデータを返しています。"
-        }
-    
+@app.post("/analyze", response_model=dict)
+async def analyze_image(request: ImageUrlRequest):
     try:
-        # 画像をSupabase Storageにアップロード
-        file_content = await image.read()
-        file_path = f"meal_images/{image.filename}"
+        # 画像URLの取得
+        image_url = request.image_url
+        print(f"受信したイメージURL: {image_url}")
         
-        supabase.storage.from_("meal-images").upload(
-            file_path,
-            file_content,
-            {"content-type": "image/jpeg"}
-        )
-        
-        # アップロードした画像のURLを取得
-        image_url = supabase.storage.from_("meal-images").get_public_url(file_path)
-        
-        # OpenAI APIキーがない場合
-        if not openai_api_key:
+        # Supabaseが初期化されていない場合
+        if supabase is None:
             return {
-                "staple": 40,
-                "main": 30,
-                "side": 30,
-                "comment": "テストモード: OpenAI APIキーがないため、テストデータを返しています。"
+                "comment": "テストモード: Supabase接続がないため、テストデータを返しています。"
             }
         
-        # GPT-4 Vision APIで画像分析
-        response = openai.chat.completions.create(
-            model="gpt-4o",  # 最新のGPT-4モデル
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": """この食事写真を詳細に分析してください。
-
-1. 写真に写っている食材をすべて特定してください。
-2. 主食・主菜・副菜の割合を以下の形式で具体的な数値で示してください：
-   - 主食：○○%
-   - 主菜：○○%
-   - 副菜：○○%
-3. その割合の根拠となる視覚的な特徴や食材の量を説明してください。
-4. 栄養バランスの観点から評価してください。
-5. 改善点があれば具体的に提案してください。
-
-なお、主食とは炭水化物を多く含む食品（米、パン、麺類など）、主菜はタンパク質源となる食品（肉、魚、豆製品など）、副菜は野菜、海藻、きのこなどのビタミン・ミネラル源となる食品を指します。
-
-必ず上記1〜5の内容を含めて回答してください。"""
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": image_url
-                        }
-                    ]
+        try:
+            # 画像URLが正しいか検証
+            if not image_url.startswith('http'):
+                print(f"警告: URLが不正な形式です: {image_url}")
+                return {
+                    "comment": "エラー: 無効な画像URLです。"
                 }
-            ],
-            max_tokens=500
-        )
-        
-        # 分析結果をパース
-        analysis_text = response.choices[0].message.content
-        # ここで分析結果を適切な形式にパースする処理が必要です
-        # 例: 正規表現や文字列処理を使用して数値とコメントを抽出
-        
-        # 仮の結果を返す
-        return {
-            "staple": 40,
-            "main": 30,
-            "side": 30,
-            "comment": "バランスの取れた食事です。"
-        }
+            
+            # OpenAI APIキーがない場合
+            if not openai_api_key:
+                return {
+                    "comment": "テストモード: OpenAI APIキーがないため、テストデータを返しています。"
+                }
+            
+            print(f"OpenAI APIを呼び出し中... image_url = {image_url}")
+            
+            try:
+                # 画像をダウンロードしてbase64エンコード
+                try:
+                    # 画像をダウンロード
+                    response = requests.get(image_url, timeout=10)
+                    response.raise_for_status()  # エラーチェック
+                    
+                    # 画像データをBase64エンコード
+                    image_data = response.content
+                    base64_image = base64.b64encode(image_data).decode('utf-8')
+                    
+                    print(f"画像のダウンロードとエンコードに成功しました。サイズ: {len(image_data)} bytes")
+                except Exception as download_error:
+                    print(f"画像のダウンロードに失敗しました: {str(download_error)}")
+                    return {
+                        "comment": f"エラー: 画像のダウンロードに失敗しました。{str(download_error)}"
+                    }
+                
+                # プロンプトを定義
+                prompt = """この食事写真を見て、親しみやすく前向きな口調で食事のバランスについてアドバイスしてください。相手を否定したり責めたりせず、励ましながら具体的なアドバイスを提供してください。
+
+以下の2点について、友達に話しかけるような温かみのある言葉で教えてあげてください：
+
+1. この食事の良い点と、続けるとどんな嬉しい変化が期待できるか：
+   （健康面でのメリットを前向きに伝えてください）
+
+2. もし良かったら試してみると嬉しい、小さな１つの提案：
+   （負担なく明日から試せる簡単なアイデアを1つだけ提案してください）
+
+専門用語は使わず、肯定的で優しい言葉遣いを心がけてください。「〜すべき」「〜しなければならない」という表現は避け、「〜すると良いかもしれません」「〜を試してみませんか？」のような提案型の言い方にしてください。"""
+                
+                # OpenAI APIを呼び出してAI応答を取得
+                ai_response = openai.chat.completions.create(
+                    model="gpt-4o",  # 最新のGPT-4モデル（Visionサポート付き）
+                    messages=[
+                        {
+                            "role": "user", 
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                            ]
+                        }
+                    ],
+                    max_tokens=300
+                )
+                
+                # 応答を取得
+                response_text = ai_response.choices[0].message.content
+                
+                return {"comment": response_text}
+                
+            except Exception as e:
+                print(f"OpenAI API呼び出しエラー: {e}")
+                return {
+                    "comment": f"エラー: OpenAI APIの呼び出しに失敗しました。{str(e)}"
+                }
+        except Exception as e:
+            print(f"エラーが発生しました: {e}")
+            return {
+                "comment": f"エラーが発生しました: {str(e)}"
+            } 
     except Exception as e:
         print(f"エラーが発生しました: {e}")
         return {
-            "staple": 40,
-            "main": 30,
-            "side": 30,
             "comment": f"エラーが発生しました: {str(e)}"
         } 
 
-@app.post("/analyze-direct")
-async def analyze_meal_direct(image: UploadFile = File(...)) -> Dict[str, Any]:
-    """Supabaseを使わずに直接OpenAI APIを使用して食事画像を分析するエンドポイント"""
+@app.post("/analyze-direct", response_model=dict)
+async def analyze_direct(file: UploadFile = File(...)):
     try:
         # OpenAI APIキーがない場合
         if not openai_api_key:
             return {
-                "staple": 40,
-                "main": 30,
-                "side": 30,
                 "comment": "テストモード: OpenAI APIキーがないため、テストデータを返しています。"
             }
         
-        # 画像をbase64エンコードして直接OpenAI APIに送信
-        file_content = await image.read()
-        base64_image = base64.b64encode(file_content).decode('utf-8')
+        try:
+            # 画像をbase64エンコードして直接OpenAI APIに送信
+            file_content = await file.read()
+            base64_image = base64.b64encode(file_content).decode('utf-8')
+            
+            print(f"アップロードされた画像のエンコードに成功しました。サイズ: {len(file_content)} bytes")
+        except Exception as encode_error:
+            print(f"画像のエンコードに失敗しました: {str(encode_error)}")
+            return {
+                "comment": f"エラー: 画像のエンコードに失敗しました。{str(encode_error)}"
+            }
         
-        # GPT-4 Vision APIで画像分析
-        response = openai.chat.completions.create(
-            model="gpt-4o",  # 最新のGPT-4モデル
+        # プロンプトを定義
+        prompt = """この食事写真を見て、親しみやすく前向きな口調で食事のバランスについてアドバイスしてください。相手を否定したり責めたりせず、励ましながら具体的なアドバイスを提供してください。
+
+以下の2点について、友達に話しかけるような温かみのある言葉で教えてあげてください：
+
+1. この食事の良い点と、続けるとどんな嬉しい変化が期待できるか：
+   （健康面でのメリットを前向きに伝えてください）
+
+2. もし良かったら試してみると嬉しい、小さな１つの提案：
+   （負担なく明日から試せる簡単なアイデアを1つだけ提案してください）
+
+専門用語は使わず、肯定的で優しい言葉遣いを心がけてください。「〜すべき」「〜しなければならない」という表現は避け、「〜すると良いかもしれません」「〜を試してみませんか？」のような提案型の言い方にしてください。"""
+        
+        # OpenAI APIを呼び出してAI応答を取得
+        ai_response = openai.chat.completions.create(
+            model="gpt-4o",  # 最新のGPT-4モデル（Visionサポート付き）
             messages=[
                 {
-                    "role": "user",
+                    "role": "user", 
                     "content": [
-                        {
-                            "type": "text",
-                            "text": """この食事写真を詳細に分析してください。
-
-1. 写真に写っている食材をすべて特定してください。
-2. 主食・主菜・副菜の割合を以下の形式で具体的な数値で示してください：
-   - 主食：○○%
-   - 主菜：○○%
-   - 副菜：○○%
-3. その割合の根拠となる視覚的な特徴や食材の量を説明してください。
-4. 栄養バランスの観点から評価してください。
-5. 改善点があれば具体的に提案してください。
-
-なお、主食とは炭水化物を多く含む食品（米、パン、麺類など）、主菜はタンパク質源となる食品（肉、魚、豆製品など）、副菜は野菜、海藻、きのこなどのビタミン・ミネラル源となる食品を指します。
-
-必ず上記1〜5の内容を含めて回答してください。"""
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            }
-                        }
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     ]
                 }
             ],
-            max_tokens=500
+            max_tokens=300
         )
         
-        # 分析結果を取得
-        analysis_text = response.choices[0].message.content
-        print(f"分析結果: {analysis_text}")
+        # 応答を取得
+        response_text = ai_response.choices[0].message.content
         
-        # 実際の分析結果をそのまま返す
-        return {
-            "analysis": analysis_text,
-            "staple": 40,  # ここは本来、分析結果から抽出した値を設定
-            "main": 30,    # ここは本来、分析結果から抽出した値を設定
-            "side": 30,    # ここは本来、分析結果から抽出した値を設定
-            "comment": analysis_text
-        }
+        return {"comment": response_text}
+        
     except Exception as e:
         print(f"エラーが発生しました: {e}")
         return {
-            "staple": 40,
-            "main": 30,
-            "side": 30,
             "comment": f"エラーが発生しました: {str(e)}"
         } 

@@ -2,13 +2,18 @@
 
 import { useState } from "react";
 
-import { Box, Container, Flex, Heading, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Container,
+  Flex,
+  Heading,
+  Text,
+  Spinner,
+  Center,
+} from "@chakra-ui/react";
 import ImageUploader from "@/components/ImageUploader";
 
 interface AnalysisResult {
-  staple: number;
-  main: number;
-  side: number;
   comment: string;
 }
 
@@ -16,38 +21,49 @@ export default function Home() {
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleImageUploaded = (url: string) => {
+  const API_URL =
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+  const handleImageUploaded = async (url: string) => {
     setUploadedImageUrl(url);
+    // 画像がアップロードされたら自動的に分析を開始
+    await analyzeImage(url);
   };
 
-  const analyzeImage = async () => {
-    if (!uploadedImageUrl) {
-      alert("画像をアップロードしてください");
+  const analyzeImage = async (imageUrl?: string) => {
+    const urlToAnalyze = imageUrl || uploadedImageUrl;
+
+    if (!urlToAnalyze) {
+      setError("画像をアップロードしてください");
       return;
     }
 
     setAnalyzing(true);
     setResult(null);
+    setError(null);
 
     try {
-      const response = await fetch("http://localhost:8000/analyze", {
+      const response = await fetch(`${API_URL}/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ image_url: uploadedImageUrl }),
+        body: JSON.stringify({ image_url: urlToAnalyze }),
       });
 
       if (!response.ok) {
-        throw new Error("分析に失敗しました");
+        throw new Error(
+          `分析に失敗しました: ${response.status} ${response.statusText}`
+        );
       }
 
       const data = await response.json();
       setResult(data);
     } catch (error) {
       console.error("Error:", error);
-      alert("分析に失敗しました");
+      setError(error instanceof Error ? error.message : "分析に失敗しました");
     } finally {
       setAnalyzing(false);
     }
@@ -67,75 +83,37 @@ export default function Home() {
           <ImageUploader onImageUploaded={handleImageUploaded} />
         </Box>
 
-        {uploadedImageUrl && (
-          <Box mb={4}>
-            <Text fontWeight="bold" mb={2}>
-              アップロードされた画像:
+        {error && (
+          <Box mt={2} p={2} bg="red.100" borderRadius="md" mb={4}>
+            <Text color="red.600" fontSize="sm">
+              エラー: {error}
             </Text>
-            <Box
-              as="button"
-              onClick={analyzeImage}
-              aria-disabled={analyzing}
-              _disabled={{ bg: "gray.300", cursor: "not-allowed" }}
-              borderWidth="1px"
-              borderRadius="lg"
-              borderColor="gray.200"
-              p={2}
-              w="full"
-              textAlign="center"
-              bg={analyzing ? "gray.300" : "teal.500"}
-              color="white"
-              _hover={{ bg: analyzing ? "gray.300" : "teal.600" }}
-              cursor={analyzing ? "not-allowed" : "pointer"}
-            >
-              {analyzing ? "分析中..." : "分析する"}
-            </Box>
           </Box>
         )}
 
-        {result && (
-          <Box borderWidth={1} borderRadius="lg" p={6} bg="gray.50">
-            <Heading as="h2" size="md" mb={4}>
-              分析結果
-            </Heading>
-            <Flex justify="space-between" mb={4}>
-              <Box
-                textAlign="center"
-                p={2}
-                bg="orange.100"
-                borderRadius="md"
-                flex={1}
-                mx={1}
-              >
-                <Text fontWeight="bold">主食</Text>
-                <Text fontSize="xl">{result.staple}%</Text>
-              </Box>
-              <Box
-                textAlign="center"
-                p={2}
-                bg="red.100"
-                borderRadius="md"
-                flex={1}
-                mx={1}
-              >
-                <Text fontWeight="bold">主菜</Text>
-                <Text fontSize="xl">{result.main}%</Text>
-              </Box>
-              <Box
-                textAlign="center"
-                p={2}
-                bg="green.100"
-                borderRadius="md"
-                flex={1}
-                mx={1}
-              >
-                <Text fontWeight="bold">副菜</Text>
-                <Text fontSize="xl">{result.side}%</Text>
-              </Box>
+        {analyzing && (
+          <Center my={8}>
+            <Flex direction="column" align="center">
+              <Spinner size="xl" color="blue.500" />
+              <Text mt={4}>AIが食事のバランスを分析しています...</Text>
             </Flex>
-            <Box>
-              <Text fontWeight="bold">コメント:</Text>
-              <Text>{result.comment}</Text>
+          </Center>
+        )}
+
+        {result && (
+          <Box borderWidth={1} borderRadius="md" p={5} bg="white">
+            <Heading as="h2" size="md" mb={4}>
+              実用的なアドバイス
+            </Heading>
+            <Box
+              p={4}
+              bg="gray.50"
+              borderRadius="md"
+              fontSize="md"
+              whiteSpace="pre-wrap"
+              lineHeight="1.6"
+            >
+              {result.comment}
             </Box>
           </Box>
         )}
