@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Box, Button, Image, Text } from "@chakra-ui/react";
+import { Box, Button, Image, Text, Flex } from "@chakra-ui/react";
 import { supabase } from "../utils/supabase";
 
 type ImageUploaderProps = {
@@ -21,18 +21,12 @@ export default function ImageUploader({ onImageUploaded }: ImageUploaderProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // アラート表示機能
-  const showToast = (title: string, status: "success" | "error") => {
-    alert(
-      `${title}: ${
-        status === "success" ? "成功しました" : "エラーが発生しました"
-      }`
-    );
-  };
+  const [uploadComplete, setUploadComplete] = useState(false);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setErrorMessage(null);
+    setUploadComplete(false);
+
     if (e.target.files?.[0]) {
       const file = e.target.files[0];
       setSelectedImage(file);
@@ -48,12 +42,13 @@ export default function ImageUploader({ onImageUploaded }: ImageUploaderProps) {
 
   const uploadImage = async () => {
     if (!selectedImage) {
-      showToast("画像を選択してください", "error");
+      setErrorMessage("画像を選択してください");
       return;
     }
 
     setUploading(true);
     setErrorMessage(null);
+    setUploadComplete(false);
 
     try {
       // ファイル名をユニークにするために現在のタイムスタンプを追加
@@ -89,8 +84,8 @@ export default function ImageUploader({ onImageUploaded }: ImageUploaderProps) {
 
       if (urlData?.publicUrl) {
         // 親コンポーネントに通知
+        setUploadComplete(true);
         onImageUploaded?.(urlData.publicUrl);
-        showToast("画像がアップロードされました", "success");
       } else {
         throw new Error("画像URLの取得に失敗しました");
       }
@@ -107,7 +102,6 @@ export default function ImageUploader({ onImageUploaded }: ImageUploaderProps) {
       }
 
       setErrorMessage(errorMsg);
-      showToast(`画像のアップロードに失敗しました: ${errorMsg}`, "error");
     } finally {
       setUploading(false);
     }
@@ -115,12 +109,13 @@ export default function ImageUploader({ onImageUploaded }: ImageUploaderProps) {
 
   return (
     <Box>
-      <Box>
+      <Flex direction="column" gap={2}>
         <Button
           variant="solid"
           colorScheme="blue"
           w="full"
           onClick={() => document.getElementById("image-upload")?.click()}
+          disabled={uploading}
         >
           写真を選択する
         </Button>
@@ -131,7 +126,7 @@ export default function ImageUploader({ onImageUploaded }: ImageUploaderProps) {
           onChange={handleImageChange}
           style={{ display: "none" }}
         />
-      </Box>
+      </Flex>
 
       {errorMessage && (
         <Box mt={2} p={2} bg="red.100" borderRadius="md">
@@ -150,15 +145,26 @@ export default function ImageUploader({ onImageUploaded }: ImageUploaderProps) {
             objectFit="contain"
             borderRadius="md"
           />
-          <Button
-            mt={4}
-            colorScheme="teal"
-            onClick={uploadImage}
-            disabled={uploading}
-            w="full"
-          >
-            {uploading ? "アップロード中..." : "Supabaseにアップロード"}
-          </Button>
+
+          {!uploadComplete && (
+            <Button
+              mt={4}
+              colorScheme="teal"
+              onClick={uploadImage}
+              disabled={uploading}
+              w="full"
+            >
+              {uploading ? "アップロード中..." : "アップロードして分析"}
+            </Button>
+          )}
+
+          {uploadComplete && (
+            <Box mt={2} p={2} bg="green.100" borderRadius="md">
+              <Text color="green.600" fontSize="sm">
+                アップロード完了！分析を開始します...
+              </Text>
+            </Box>
+          )}
         </Box>
       )}
     </Box>
