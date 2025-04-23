@@ -1,7 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { Box, Button, Image, Text, Flex } from "@chakra-ui/react";
+import { useState, useEffect } from "react";
+import {
+  Box,
+  Button,
+  Image,
+  Text,
+  Icon,
+  VStack,
+  Center,
+} from "@chakra-ui/react";
+import { Camera } from "lucide-react";
+import { useTheme } from "next-themes";
 import { supabase } from "../utils/supabase";
 
 type ImageUploaderProps = {
@@ -22,6 +32,16 @@ export default function ImageUploader({ onImageUploaded }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [uploadComplete, setUploadComplete] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // useEffectでマウント状態を管理
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // マウント前はデフォルトのlightテーマを使用
+  const colorMode = mounted ? resolvedTheme : "light";
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setErrorMessage(null);
@@ -108,17 +128,46 @@ export default function ImageUploader({ onImageUploaded }: ImageUploaderProps) {
   };
 
   return (
-    <Box>
-      <Flex direction="column" gap={2}>
-        <Button
-          variant="solid"
-          colorScheme="blue"
-          w="full"
-          onClick={() => document.getElementById("image-upload")?.click()}
-          disabled={uploading}
-        >
-          写真を選択する
-        </Button>
+    <VStack gap={4} w="100%">
+      <Center
+        w="100%"
+        borderWidth={2}
+        borderStyle="dashed"
+        borderRadius="xl"
+        borderColor={colorMode === "dark" ? "gray.600" : "gray.300"}
+        bg={colorMode === "dark" ? "gray.700" : "gray.50"}
+        py={6}
+        px={4}
+        minH="150px"
+        onClick={() => document.getElementById("image-upload")?.click()}
+        cursor="pointer"
+        _hover={{
+          borderColor: "blue.500",
+          bg: colorMode === "dark" ? "gray.600" : "gray.100",
+        }}
+        transition="all 0.2s"
+      >
+        <VStack gap={3}>
+          <Icon
+            as={Camera}
+            w={{ base: 10, md: 12 }}
+            h={{ base: 10, md: 12 }}
+            color={colorMode === "dark" ? "blue.300" : "blue.500"}
+          />
+          <Text
+            fontSize={{ base: "md", md: "lg" }}
+            fontWeight="medium"
+            textAlign="center"
+          >
+            タップして食事の写真をアップロード
+          </Text>
+          <Text
+            fontSize="sm"
+            color={colorMode === "dark" ? "gray.400" : "gray.500"}
+          >
+            スマホで撮影した料理の写真を選択
+          </Text>
+        </VStack>
         <input
           id="image-upload"
           type="file"
@@ -126,25 +175,45 @@ export default function ImageUploader({ onImageUploaded }: ImageUploaderProps) {
           onChange={handleImageChange}
           style={{ display: "none" }}
         />
-      </Flex>
+      </Center>
 
       {errorMessage && (
-        <Box mt={2} p={2} bg="red.100" borderRadius="md">
-          <Text color="red.600" fontSize="sm">
+        <Box
+          mt={2}
+          p={3}
+          bg={colorMode === "dark" ? "red.900" : "red.100"}
+          borderRadius="lg"
+          w="100%"
+        >
+          <Text
+            color={colorMode === "dark" ? "red.300" : "red.600"}
+            fontSize={{ base: "sm", md: "md" }}
+          >
             エラー: {errorMessage}
           </Text>
         </Box>
       )}
 
       {previewUrl && (
-        <Box mt={4}>
-          <Text mb={2}>プレビュー</Text>
-          <Image
-            src={previewUrl}
-            maxH="300px"
-            objectFit="contain"
-            borderRadius="md"
-          />
+        <Box mt={2} w="100%">
+          <Text mb={2} fontSize={{ base: "sm", md: "md" }}>
+            プレビュー
+          </Text>
+          <Box
+            borderRadius="xl"
+            overflow="hidden"
+            boxShadow="md"
+            maxH={{ base: "300px", md: "400px" }}
+            w="100%"
+          >
+            <Image
+              src={previewUrl}
+              objectFit="contain"
+              w="100%"
+              h="auto"
+              maxH={{ base: "300px", md: "400px" }}
+            />
+          </Box>
 
           {!uploadComplete && (
             <Button
@@ -152,21 +221,35 @@ export default function ImageUploader({ onImageUploaded }: ImageUploaderProps) {
               colorScheme="teal"
               onClick={uploadImage}
               disabled={uploading}
-              w="full"
+              w="100%"
+              h={{ base: "50px", md: "56px" }}
+              fontSize={{ base: "md", md: "lg" }}
+              borderRadius="lg"
+              boxShadow="md"
+              _hover={{ transform: "translateY(-2px)", boxShadow: "lg" }}
+              transition="all 0.2s"
             >
               {uploading ? "アップロード中..." : "アップロードして分析"}
             </Button>
           )}
 
           {uploadComplete && (
-            <Box mt={2} p={2} bg="green.100" borderRadius="md">
-              <Text color="green.600" fontSize="sm">
+            <Box
+              mt={3}
+              p={3}
+              bg={colorMode === "dark" ? "green.900" : "green.100"}
+              borderRadius="lg"
+            >
+              <Text
+                color={colorMode === "dark" ? "green.300" : "green.600"}
+                fontSize={{ base: "sm", md: "md" }}
+              >
                 アップロード完了！分析を開始します...
               </Text>
             </Box>
           )}
         </Box>
       )}
-    </Box>
+    </VStack>
   );
 }
