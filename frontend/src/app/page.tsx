@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-
+import { useState, useEffect } from "react";
 import {
   Box,
   Container,
@@ -10,7 +9,11 @@ import {
   Text,
   Spinner,
   Center,
+  IconButton,
+  VStack,
 } from "@chakra-ui/react";
+import { Sun, Moon } from "lucide-react";
+import { useTheme } from "next-themes";
 import ImageUploader from "@/components/ImageUploader";
 
 interface AnalysisResult {
@@ -22,6 +25,20 @@ export default function Home() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // useEffectでマウント状態を管理
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const toggleColorMode = () => {
+    setTheme(resolvedTheme === "light" ? "dark" : "light");
+  };
+
+  // マウント前はデフォルトのlightテーマを使用
+  const colorMode = mounted ? resolvedTheme : "light";
 
   const API_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
@@ -70,46 +87,80 @@ export default function Home() {
   };
 
   return (
-    <Container maxW="container.md" py={8}>
-      <Box>
-        <Heading as="h1" size="xl" textAlign="center" mb={8}>
-          食事バランスチェッカー
-        </Heading>
+    <Container
+      maxW={{ base: "100%", md: "container.md" }}
+      px={{ base: 4, md: 8 }}
+      py={{ base: 6, md: 10 }}
+    >
+      <Flex justifyContent="flex-end" mb={2}>
+        {mounted && (
+          <IconButton
+            aria-label={`${
+              colorMode === "light" ? "ダークモード" : "ライトモード"
+            }に切り替え`}
+            onClick={toggleColorMode}
+            size="md"
+            borderRadius="full"
+          >
+            {colorMode === "light" ? <Moon size={20} /> : <Sun size={20} />}
+          </IconButton>
+        )}
+      </Flex>
 
-        <Box mb={6}>
-          <Text mb={4}>
+      <VStack gap={{ base: 5, md: 8 }} align="stretch">
+        <Box textAlign="center">
+          <Heading
+            as="h1"
+            fontSize={{ base: "2xl", md: "3xl" }}
+            mb={{ base: 3, md: 5 }}
+          >
+            食事バランスチェッカー
+          </Heading>
+
+          <Text fontSize={{ base: "sm", md: "md" }} maxW="3xl" mx="auto">
             食事の写真をアップロードして、栄養バランスを分析します
           </Text>
+        </Box>
+
+        <Box w="100%" mx="auto" mt={{ base: 2, md: 4 }}>
           <ImageUploader onImageUploaded={handleImageUploaded} />
         </Box>
 
         {error && (
-          <Box mt={2} p={2} bg="red.100" borderRadius="md" mb={4}>
-            <Text color="red.600" fontSize="sm">
+          <Box mt={2} p={3} bg="red.100" borderRadius="lg" mb={4}>
+            <Text color="red.600" fontSize={{ base: "sm", md: "md" }}>
               エラー: {error}
             </Text>
           </Box>
         )}
 
         {analyzing && (
-          <Center my={8}>
+          <Center my={{ base: 6, md: 10 }}>
             <Flex direction="column" align="center">
               <Spinner size="xl" color="blue.500" />
-              <Text mt={4}>AIが食事のバランスを分析しています...</Text>
+              <Text mt={4} fontSize={{ base: "sm", md: "md" }}>
+                AIが食事のバランスを分析しています...
+              </Text>
             </Flex>
           </Center>
         )}
 
         {result && (
-          <Box borderWidth={1} borderRadius="md" p={5} bg="white">
+          <Box
+            borderWidth={1}
+            borderRadius="lg"
+            p={{ base: 4, md: 6 }}
+            bg={colorMode === "dark" ? "gray.700" : "white"}
+            shadow="md"
+          >
             <Heading as="h2" size="md" mb={4}>
               実用的なアドバイス
             </Heading>
             <Box
               p={4}
-              bg="gray.50"
+              bg={colorMode === "dark" ? "gray.800" : "gray.50"}
               borderRadius="md"
-              fontSize="md"
+              fontSize={{ base: "sm", md: "md" }}
               whiteSpace="pre-wrap"
               lineHeight="1.6"
             >
@@ -117,7 +168,7 @@ export default function Home() {
             </Box>
           </Box>
         )}
-      </Box>
+      </VStack>
     </Container>
   );
 }
