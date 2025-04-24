@@ -51,6 +51,40 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
+## Docker を使用したセットアップ
+
+1. Docker と Docker Compose がインストールされていることを確認
+
+2. .env ファイルが設定されていることを確認
+
+3. Docker Compose でアプリを起動
+
+```bash
+docker-compose up -d
+```
+
+バックエンドは http://localhost:8000 でアクセス可能になります。
+
+## GCP Cloud Run へのデプロイ
+
+1. Google Cloud CLI がインストールされていることを確認
+
+2. Google Cloud にログイン
+
+```bash
+gcloud auth login
+gcloud config set project meal-checker
+```
+
+3. デプロイスクリプトを実行
+
+```bash
+cd backend
+./deploy.sh
+```
+
+デプロイが完了すると、コンソールに Cloud Run の URL が表示されます。
+
 ## 使用方法
 
 1. フロントエンド（http://localhost:3000）にアクセス
