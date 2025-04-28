@@ -354,15 +354,48 @@ async def analyze_image(request: ImageUrlRequest):
                 filename = image_url.split('/')[-1]
                 print(f"📝 抽出したファイル名: {filename}")
                 
+                # プロンプトを定義
+                prompt = """この食事写真を見て、親しみやすく前向きな口調で食事のバランスについてアドバイスしてください。相手を否定したり責めたりせず、励ましながら具体的なアドバイスを提供してください。
+
+以下の2点について、友達に話しかけるような温かみのある言葉で教えてあげてください：
+
+1. この食事の良い点と、続けるとどんな嬉しい変化が期待できるか：
+   （健康面でのメリットを前向きに伝えてください）
+
+2. もし良かったら試してみると嬉しい、小さな１つの提案：
+   （負担なく明日から試せる簡単なアイデアを1つだけ提案してください）
+
+専門用語は使わず、肯定的で優しい言葉遣いを心がけてください。「〜すべき」「〜しなければならない」という表現は避け、「〜すると良いかもしれません」「〜を試してみませんか？」のような提案型の言い方にしてください。"""
+                
+                # OpenAI APIを呼び出し
+                print("🤖 GPT-4o Vision APIを呼び出し中...")
+                ai_response = openai.chat.completions.create(
+                    model="gpt-4o",  # 最新のGPT-4モデル（Visionサポート付き）
+                    messages=[
+                        {
+                            "role": "user", 
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                            ]
+                        }
+                    ],
+                    max_tokens=300
+                )
+                
+                # 応答を取得
+                analysis_result = ai_response.choices[0].message.content
+                print(f"✅ GPT-4o分析結果: {analysis_result[:100]}...")
+                
                 # メタデータをDBに保存
                 print("💾 メタデータ保存処理開始...")
                 await save_image_metadata(
                     filename=filename,
                     public_url=image_url,
-                    analysis_result=base64_image
+                    analysis_result=analysis_result
                 )
                 
-                return {"comment": base64_image}
+                return {"comment": analysis_result}
                 
             except Exception as e:
                 print(f"❌ OpenAI API呼び出しエラー: {e}")
