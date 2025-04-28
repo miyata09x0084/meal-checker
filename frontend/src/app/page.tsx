@@ -62,13 +62,19 @@ export default function Home() {
     setError(null);
 
     try {
+      console.log(`バックエンドAPIを呼び出し中: ${API_URL}/analyze`);
+      console.log("送信データ:", { image_url: urlToAnalyze });
+
       const response = await fetch(`${API_URL}/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include", // CORS対応のためにcredentialsを追加
         body: JSON.stringify({ image_url: urlToAnalyze }),
       });
+
+      console.log("レスポンスステータス:", response.status);
 
       if (!response.ok) {
         throw new Error(
@@ -77,6 +83,7 @@ export default function Home() {
       }
 
       const data = await response.json();
+      console.log("分析結果:", data);
       setResult(data);
     } catch (error) {
       console.error("Error:", error);
